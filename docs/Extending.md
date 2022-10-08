@@ -19,35 +19,34 @@ public class MyService
 
     public async Task MyMethod()
     {
-        using (var cref = _umbracoContextFactory.EnsureUmbracoContext())
+        using var cref = _umbracoContextFactory.EnsureUmbracoContext();
+
+        // Create a new redirect
+        Redirect redirect = new Redirect
         {
-            // Create a new redirect
-            Redirect redirect = new Redirect
-            {
-                SourceUrl = "/home/lorem/ipsum"
-                TargetRootNode = cref.UmbracoContext.Content.GetById(1234),
-                TargetNode = cref.UmbracoContext.Content.GetById(1235),
-                TargetStatusCode = HttpStatusCode.Found,
-                Culture = "en-US"
-            }
-
-            // Add the redirect and reassign the variable. The new value has an id assigned.
-            //    If the redirect is invalid, this method will throw an ArgumentException.
-            //    Check the inner exception for details.
-            redirect = await _redirectService.AddAsync(redirect);
-
-            // Change the redirect
-            redirect.TargetNode = null;
-            redirect.TargetUrl = "https://example.com/";
-
-            // Update the redirect and reassign the variable
-            //    If the redirect is invalid, this method will throw an ArgumentException.
-            //    Check the inner exception for details.
-            redirect = await _redirectService.UpdateAsync(redirect);
-
-            // Search for redirects
-            RedirectCollection searchResults = await _redirectService.GetAsync(skip: 0, take: 10, query: "homepage");
+            SourceUrl = "/home/lorem/ipsum"
+            TargetRootNode = cref.UmbracoContext.Content.GetById(1234),
+            TargetNode = cref.UmbracoContext.Content.GetById(1235),
+            TargetStatusCode = HttpStatusCode.Found,
+            Culture = "en-US"
         }
+
+        // Add the redirect and reassign the variable. The new value has an id assigned.
+        //    If the redirect is invalid, this method will throw an ArgumentException.
+        //    Check the inner exception for details.
+        redirect = await _redirectService.AddAsync(redirect);
+
+        // Change the redirect
+        redirect.TargetNode = null;
+        redirect.TargetUrl = "https://example.com/";
+
+        // Update the redirect and reassign the variable
+        //    If the redirect is invalid, this method will throw an ArgumentException.
+        //    Check the inner exception for details.
+        redirect = await _redirectService.UpdateAsync(redirect);
+
+        // Search for redirects
+        RedirectCollection searchResults = await _redirectService.GetAsync(skip: 0, take: 10, query: "homepage");
     }
 }
 ```
@@ -66,20 +65,20 @@ public class ApiRequestFilter : IRequestInterceptFilter
     {
         // Return false to stop processing of this url. Return true to continue processing.
         //    If any filter returns false, the URL Tracker will not process the request.
-        return new ValueTask<bool>(url.Path?.StartsWith("/api") != true);
+        return new ValueTask<bool>(url.Path?.StartsWith("/api") is not true);
     }
 }
 
-public class MyComposer : IUserComposer
+public class MyComposer : IComposer
 {
-    public void Compose(Composition composition)
+    public void Compose(IUmbracoBuilder builder)
     {
         // Add the filter to the collection
-        composition.RequestInterceptFilters()
+        builder.RequestInterceptFilters()
             .Append<ApiRequestFilter>();
 
         // Remove any other filter from the collection if you want
-        composition.RequestInterceptFilters()
+        builder.RequestInterceptFilters()
             .Remove<UrlReservedPathFilter>();
     }
 }
@@ -98,20 +97,20 @@ public class JsSourceMapClientErrorFilter : IClientErrorFilter
     {
         // Return false to stop prevent registration of this client error. Return true to continue registration
         //    If any filter returns false, the URL Tracker will not register the client error.
-        return new ValueTask<bool>(notification.Url.Path?.EndsWith(".js.map") != true);
+        return new ValueTask<bool>(notification.Url.Path?.EndsWith(".js.map") is not true);
     }
 }
 
-public class MyComposer : IUserComposer
+public class MyComposer : IComposer
 {
-    public void Compose(Composition composition)
+    public void Compose(IUmbracoBuilder builder)
     {
         // Add the filter to the collection
-        composition.ClientErrorFilters()
+        builder.ClientErrorFilters()
             .Append<JsSourceMapClientErrorFilter>();
 
         // Remove any other filter from the collection if you want
-        composition.ClientErrorFilters()
+        builder.ClientErrorFilters()
             .Remove<ConfigurationClientErrorFilter>();
     }
 }
@@ -132,7 +131,7 @@ using UrlTracker.Core.Intercepting.Models;
 
 public class MyCustomInterceptor : IInterceptor
 {
-    public ValueTask<ICachableIntercept> InterceptAsync(Url url, IReadOnlyInterceptContext context)
+    public ValueTask<ICachableIntercept?> InterceptAsync(Url url, IReadOnlyInterceptContext context)
     {
         // Read properties from the url and the context
         var culture = context.GetCulture();
@@ -140,33 +139,33 @@ public class MyCustomInterceptor : IInterceptor
         // Whatever you return here is what will later be handled by the handlers
         // You could:
         //  1) return a familiar model. Familiar models already have handlers and won't require you to define a handler yourself. Familiar models are: UrlTrackerShallowRedirect, UrlTrackerShallowClientError and CachableInterceptBase.NullIntercept
-        return new ValueTask<ICachableIntercept>(new CachableInterceptBase<UrlTrackerShallowRedirect>(new UrlTrackerShallowRedirect()));
+        return new ValueTask<ICachableIntercept?>(new CachableInterceptBase<UrlTrackerShallowRedirect>(new UrlTrackerShallowRedirect()));
 
         //  2) return your own model. You'll have to implement a handler later to handle your own model
         //     Either return CachableInterceptBase with an instance of your model or implement ICachableIntercept yourself.
         //     As the name suggests: your model must be cachable. You shouldn't return IPublishedContent here for example.
-        return new ValueTask<ICachableIntercept>(new CachableInterceptBase<MyCachableModel>(new MyCachableModel()));
+        return new ValueTask<ICachableIntercept?>(new CachableInterceptBase<MyCachableModel>(new MyCachableModel()));
 
         //  3) return null. return null to indicate that your handler couldn't match the incoming url. The URL Tracker will continue the search with other handlers
-        return new valueTask<ICachableIntercept>(null);
+        return new valueTask<ICachableIntercept?>(null);
     }
 }
 
-public class MyComposer : IUserComposer
+public class MyComposer : IComposer
 {
-    public void Compose(Composition composition)
+    public void Compose(IUmbracoBuilder builder)
     {
         // Add the handler to the collection
-        composition.Interceptors()
+        builder.Interceptors()
             .Append<MyCustomInterceptor>();
 
         // Remove any other handlers from the collection if you want
-        composition.Interceptors()
+        builder.Interceptors()
             .Remove<RegexRedirectInterceptor>();
 
         // Interceptors are evaluated in order.
         //    You can also insert your handler before another
-        composition.Interceptors()
+        builder.Interceptors()
             .InsertBefore<NoLongerExistsInterceptor, MyCustomInterceptor>();
     }
 }
@@ -180,28 +179,34 @@ using UrlTracker.Web.Processing;
 
 public class MyInterceptHandler : ResponseInterceptHandlerBase<MyInterceptModel>
 {
-    protected override async ValueTask HandleAsync(HttpContextBase context, MyInterceptModel intercept)
+    protected override async ValueTask HandleAsync(RequestDelegate next, HttpContext context, MyInterceptModel intercept)
     {
-        // From here it's up to you to decide what happens to the request.
-        //    You can send a response back to the client or you can do nothing and let the response through
+        // From here you're acting as a middleware and can decide what to do with the request, based on the intercept model.
+        // You can choose to let the request through:
+        await next(context);
+
+        // You can also do something else:
+        context.Response.StatusCode = 418;
+
+        // It's all up to you what happens now... continue, change, return, etc.
     }
 }
 
-public class MyComposer : IUserComposer
+public class MyComposer : IComposer
 {
-    public void Compose(Composition composition)
+    public void Compose(IUmbracoBuilder builder)
     {
         // Add the handler to the collection
-        composition.ResponseInterceptHandlers()
+        builder.ResponseInterceptHandlers()
             .Append<MyInterceptHandler>();
 
         // Remove any other handlers from the collection if you want
-        composition.ResponseInterceptHandlers()
+        builder.ResponseInterceptHandlers()
             .Remove<RedirectResponseInterceptHandler>();
 
         // Interceptors are evaluated in order.
         //    You can also insert your handler before another
-        composition.ResponseInterceptHandlers()
+        builder.ResponseInterceptHandlers()
             .InsertBefore<NullInterceptHandler, MyInterceptHandler>();
     }
 }
