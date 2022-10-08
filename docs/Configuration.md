@@ -1,5 +1,5 @@
 # Configuration
-_This content is also available in [the readme](https://github.com/Infocaster/UrlTracker/blob/v9/main/README.md)_
+_This content is also available in [the readme](https://github.com/Infocaster/UrlTracker/blob/v10/main/README.md)_
 
 The URL Tracker exposes some configurations in the appsettings.json file. All configurations are optional. A complete configuration may look like this:
 ```json
